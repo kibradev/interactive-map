@@ -13,9 +13,7 @@
 <body>
 
 <div id="map"></div>
-
 <script>
-// --- SABİT AYARLAR ---
 const center_x = 117.3;
 const center_y = 172.8;
 const scale_x = 0.02072;
@@ -38,9 +36,7 @@ CUSTOM_CRS = L.extend({}, L.CRS.Simple, {
     infinite: true
 });
 
-// --- TILE LAYERLAR ---
 var AtlasStyle    = L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg', {minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false, attribution: 'Online map GTA V', id: 'styleAtlas map'});
-
 var ExampleGroup = L.layerGroup();
 var Icons = { "Example" : ExampleGroup };
 
@@ -54,7 +50,8 @@ var mymap = L.map('map', {
     layers: [AtlasStyle], 
     center: [0, 0],
     zoom: 3,
-    zoomControl: false 
+    zoomControl: false, 
+    attributionControl: false
 });
 
 function customIcon(icon){
@@ -75,24 +72,20 @@ var coordsList = params.get('coords');
 var boundsGroup = L.featureGroup();
 
 if (coordsList) {
-    // --- ÇOKLU KOORDİNAT MODU ---
-    // Format: x,y,mesaj;x,y,mesaj
     var points = coordsList.split(';');
-    
+     
     points.forEach(function(point) {
         var parts = point.split(',');
-        
-        // En az 2 eleman varsa (X ve Y) işlem yap
+         
         if (parts.length >= 2) {
             var px = parseFloat(parts[0]);
             var py = parseFloat(parts[1]);
-            
-            // 3. eleman varsa onu mesaj yap, yoksa koordinatı yaz
+             
             var popupText = parts[2] ? parts[2] : ("Konum: " + px + ", " + py);
-            
+             
             var marker = L.marker([py, px], {icon: customIcon(1)})
                 .bindPopup(popupText);
-                
+                 
             marker.addTo(ExampleGroup);
             marker.addTo(boundsGroup);
         }
@@ -103,15 +96,12 @@ if (coordsList) {
     }
 
 } else {
-    // --- ESKİ TEKLİ MOD ---
-    // Örnek: ?x=100&y=200&text=Selam
     var x = parseFloat(params.get('x')) || 0;
     var y = parseFloat(params.get('y')) || 0;
-    
-    // Linkte 'text' varsa onu al, yoksa default yaz
+     
     var textParam = params.get('text');
     var popupText = textParam ? textParam : "Konum: " + x + ", " + y;
-    
+     
     var marker = L.marker([y, x], {icon: customIcon(1)})
         .addTo(ExampleGroup)
         .bindPopup(popupText);
