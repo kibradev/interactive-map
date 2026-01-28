@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Custom GTA Map - Kibra Edition</title>
+<title>Custom GTA Map - Kibra Edition v3</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <style>
@@ -15,86 +15,108 @@
 <div id="map"></div>
 
 <script>
-// Harita Ayarları (Senin ayarlar aynen duruyor)
-const center_x = 117.3, center_y = 172.8, scale_x = 0.02072, scale_y = 0.0205;
+// --- SABİT AYARLAR ---
+const center_x = 117.3;
+const center_y = 172.8;
+const scale_x = 0.02072;
+const scale_y = 0.0205;
 
 CUSTOM_CRS = L.extend({}, L.CRS.Simple, {
     projection: L.Projection.LonLat,
-    scale: z => Math.pow(2, z),
-    zoom: sc => Math.log(sc) / 0.6931471805599453,
-    distance: (p1, p2) => Math.sqrt(Math.pow(p2.lng - p1.lng, 2) + Math.pow(p2.lat - p1.lat, 2)),
+    scale: function(zoom) {
+        return Math.pow(2, zoom);
+    },
+    zoom: function(sc) {
+        return Math.log(sc) / 0.6931471805599453;
+    },
+    distance: function(pos1, pos2) {
+        var x_difference = pos2.lng - pos1.lng;
+        var y_difference = pos2.lat - pos1.lat;
+        return Math.sqrt(x_difference * x_difference + y_difference * y_difference);
+    },
     transformation: new L.Transformation(scale_x, center_x, -scale_y, center_y),
     infinite: true
 });
 
-// Tile Layer'lar
-var Atlas = L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg', {minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false, id: 'Atlas'});
-var Satelite = L.tileLayer('mapStyles/styleSatelite/{z}/{x}/{y}.jpg', {minZoom: 0, maxZoom: 8, noWrap: true, continuousWorld: false, id: 'Satelite'});
-var Grid = L.tileLayer('mapStyles/styleGrid/{z}/{x}/{y}.png', {minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false, id: 'Grid'});
+// --- TILE LAYERLAR ---
+var AtlasStyle    = L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg', {minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false, attribution: 'Online map GTA V', id: 'styleAtlas map'});
 
 var ExampleGroup = L.layerGroup();
-var Icons = {"Example": ExampleGroup};
+var Icons = { "Example" : ExampleGroup };
 
 var mymap = L.map('map', {
     crs: CUSTOM_CRS,
     minZoom: 1,
     maxZoom: 5,
-    layers: [Atlas],
+    Zoom: 5,
+    maxNativeZoom: 5,
+    preferCanvas: true,
+    layers: [AtlasStyle], 
     center: [0, 0],
     zoom: 3,
-    zoomControl: false // İstersen true yap, sana kalmış
+    zoomControl: false 
 });
 
-// İkon Fonksiyonu
-function customIcon(i){
+function customIcon(icon){
     return L.icon({
-        iconUrl: 'blips/1.png', // Buradaki resmin olduğundan emin ol kral
-        iconSize: [20, 20],
-        iconAnchor: [20, 20],
-        popupAnchor: [-10, -27]
+        iconUrl: `blips/1.png`, 
+        iconSize:     [20, 20],
+        iconAnchor:   [20, 20], 
+        popupAnchor:  [-10, -27]
     });
 }
 
 ExampleGroup.addTo(mymap);
 
-// --- BURASI OLAYIN KOPTUĞU YER ---
+// --- URL PARAMETRE KONTROLÜ (Text Özelliği Eklendi) ---
 var params = new URLSearchParams(window.location.search);
-
-// 1. Durum: URL'de "coords" var mı? (Çoklu kullanım için)
-// Kullanım: ?coords=x1,y1;x2,y2;x3,y3
 var coordsList = params.get('coords');
 
+var boundsGroup = L.featureGroup();
+
 if (coordsList) {
-    // Noktalı virgüle göre ayırıp her birini işliyoruz
+    // --- ÇOKLU KOORDİNAT MODU ---
+    // Format: x,y,mesaj;x,y,mesaj
     var points = coordsList.split(';');
     
     points.forEach(function(point) {
-        var xy = point.split(',');
-        if (xy.length === 2) {
-            var px = parseFloat(xy[0]);
-            var py = parseFloat(xy[1]);
+        var parts = point.split(',');
+        
+        // En az 2 eleman varsa (X ve Y) işlem yap
+        if (parts.length >= 2) {
+            var px = parseFloat(parts[0]);
+            var py = parseFloat(parts[1]);
             
-            // Marker ekle
-            L.marker([py, px], {icon: customIcon(1)})
-             .addTo(ExampleGroup)
-             .bindPopup("Konum: " + px + ", " + py);
+            // 3. eleman varsa onu mesaj yap, yoksa koordinatı yaz
+            var popupText = parts[2] ? parts[2] : ("Konum: " + px + ", " + py);
+            
+            var marker = L.marker([py, px], {icon: customIcon(1)})
+                .bindPopup(popupText);
+                
+            marker.addTo(ExampleGroup);
+            marker.addTo(boundsGroup);
         }
     });
-    
-    // Haritayı ilk koordinata ortalayalım ki kaybolma
-    var firstPoint = points[0].split(',');
-    mymap.setView([parseFloat(firstPoint[1]), parseFloat(firstPoint[0])], 4);
+
+    if (boundsGroup.getLayers().length > 0) {
+        mymap.fitBounds(boundsGroup.getBounds(), {padding: [50, 50]});
+    }
 
 } else {
-    // 2. Durum: Eski usul tekli kullanım (Backward Compatibility dedikleri olay)
-    // Kullanım: ?x=100&y=200
+    // --- ESKİ TEKLİ MOD ---
+    // Örnek: ?x=100&y=200&text=Selam
     var x = parseFloat(params.get('x')) || 0;
     var y = parseFloat(params.get('y')) || 0;
     
+    // Linkte 'text' varsa onu al, yoksa default yaz
+    var textParam = params.get('text');
+    var popupText = textParam ? textParam : "Konum: " + x + ", " + y;
+    
+    var marker = L.marker([y, x], {icon: customIcon(1)})
+        .addTo(ExampleGroup)
+        .bindPopup(popupText);
+        
     mymap.setView([y, x], 4);
-    L.marker([y, x], {icon: customIcon(1)})
-     .addTo(ExampleGroup)
-     .bindPopup("Burdayım aw");
 }
 
 </script>
