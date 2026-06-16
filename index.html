@@ -16,6 +16,109 @@
         border: none !important;
         background: transparent !important;
     }
+
+    .leaflet-popup.ios-map-popup {
+        margin-bottom: 10px;
+    }
+    .leaflet-popup.ios-map-popup .leaflet-popup-content-wrapper {
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border-radius: 14px;
+        box-shadow:
+            0 8px 28px rgba(0, 0, 0, 0.14),
+            0 2px 8px rgba(0, 0, 0, 0.06),
+            inset 0 0.5px 0 rgba(255, 255, 255, 0.85);
+        border: 0.5px solid rgba(0, 0, 0, 0.08);
+        padding: 0;
+    }
+    .leaflet-popup.ios-map-popup .leaflet-popup-content {
+        margin: 0;
+        padding: 0;
+        line-height: 1.2;
+        min-width: 0;
+    }
+    .leaflet-popup.ios-map-popup .leaflet-popup-tip-container {
+        width: 22px;
+        height: 12px;
+        margin-top: -1px;
+    }
+    .leaflet-popup.ios-map-popup .leaflet-popup-tip {
+        width: 14px;
+        height: 14px;
+        margin: -7px auto 0;
+        padding: 0;
+        background: rgba(255, 255, 255, 0.94);
+        border: 0.5px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        transform: rotate(45deg);
+    }
+    .leaflet-popup.ios-map-popup .leaflet-popup-close-button {
+        display: none;
+    }
+
+    .ios-popup-inner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    }
+    .ios-popup-icon {
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.04);
+    }
+    .ios-popup-icon img {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
+        display: block;
+    }
+    .ios-popup-icon-player {
+        background: rgba(12, 121, 254, 0.12);
+        position: relative;
+    }
+    .ios-popup-icon-player::after {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #0C79FE;
+        box-shadow: 0 0 0 2px #fff;
+    }
+    .ios-popup-label {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.2px;
+        color: #1c1c1e;
+        word-break: break-word;
+    }
+
+    @keyframes iosMapPopupIn {
+        from {
+            opacity: 0;
+            transform: translateY(8px) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    .leaflet-popup.ios-map-popup.ios-popup-enter .leaflet-popup-content-wrapper {
+        animation: iosMapPopupIn 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+        transform-origin: center bottom;
+    }
+    .leaflet-popup.ios-map-popup.ios-popup-enter .leaflet-popup-tip-container {
+        animation: iosMapPopupIn 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+        transform-origin: center top;
+    }
 </style>
 </head>
 <body>
@@ -144,6 +247,117 @@ function popupFromPart(p) {
     try { return decodeURIComponent(p); } catch (e1) { return p; }
 }
 
+function escapePopupHtml(text) {
+    return String(text || 'Location')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+var IOS_POPUP_OPTS = {
+    className: 'ios-map-popup',
+    closeButton: false,
+    autoPan: true,
+    maxWidth: 260,
+    minWidth: 72,
+    offset: [0, -6]
+};
+
+function iosPopupHtml(label, spriteId, isPlayer) {
+    var safe = escapePopupHtml(label);
+    var iconHtml = '';
+    if (isPlayer) {
+        iconHtml = '<span class="ios-popup-icon ios-popup-icon-player" aria-hidden="true"></span>';
+    } else if (spriteId !== null && spriteId !== undefined && Number.isFinite(Number(spriteId))) {
+        iconHtml = '<span class="ios-popup-icon"><img src="' + blipIconUrl(spriteId) + '" alt="" draggable="false" /></span>';
+    }
+    return '<div class="ios-popup-inner">' + iconHtml + '<span class="ios-popup-label">' + safe + '</span></div>';
+}
+
+function bindIosPopup(marker, label, spriteId, isPlayer) {
+    marker.bindPopup(iosPopupHtml(label, spriteId, isPlayer), IOS_POPUP_OPTS);
+}
+
+function postToPhone(payload) {
+    try { window.parent.postMessage(payload, '*'); } catch (e0) {}
+    try { if (window.top && window.top !== window) window.top.postMessage(payload, '*'); } catch (e1) {}
+}
+
+function postBlipSelect(x, y, label, sprite) {
+    postToPhone({
+        source: '0r-phone-map',
+        type: 'blipSelect',
+        x: x,
+        y: y,
+        label: label,
+        sprite: sprite
+    });
+}
+
+function postBlipClear() {
+    postToPhone({ source: '0r-phone-map', type: 'blipClear' });
+}
+
+var suppressBlipMapClear = false;
+
+function tagBlipMarker(marker, x, y, label, sprite) {
+    marker.options.phoneBlipData = { x: x, y: y, label: label, sprite: sprite };
+}
+
+function attachBlipSelect(marker, x, y, label, sprite) {
+    tagBlipMarker(marker, x, y, label, sprite);
+    marker.on('click', function(ev) {
+        L.DomEvent.stopPropagation(ev);
+        if (ev.originalEvent) {
+            L.DomEvent.stopPropagation(ev.originalEvent);
+        }
+        suppressBlipMapClear = true;
+        postBlipSelect(x, y, label, sprite);
+        window.setTimeout(function() {
+            suppressBlipMapClear = false;
+        }, 200);
+    });
+}
+
+function findNearestBlipAt(latlng, maxDist) {
+    var best = null;
+    var bestD = maxDist;
+    blipsLayer.eachLayer(function(layer) {
+        var data = layer.options && layer.options.phoneBlipData;
+        if (!data) return;
+        var ll = layer.getLatLng();
+        if (!ll) return;
+        var d = Math.hypot(ll.lng - latlng.lng, ll.lat - latlng.lat);
+        if (d < bestD) {
+            bestD = d;
+            best = data;
+        }
+    });
+    return best;
+}
+
+mymap.on('click', function(ev) {
+    if (suppressBlipMapClear) return;
+    var hit = findNearestBlipAt(ev.latlng, 140);
+    if (hit) {
+        postBlipSelect(hit.x, hit.y, hit.label, hit.sprite);
+        return;
+    }
+    postBlipClear();
+});
+
+mymap.on('popupopen', function(ev) {
+    var el = ev.popup && ev.popup.getElement ? ev.popup.getElement() : null;
+    if (!el || !el.classList.contains('ios-map-popup')) return;
+    el.classList.remove('ios-popup-enter');
+    void el.offsetWidth;
+    el.classList.add('ios-popup-enter');
+    el.addEventListener('animationend', function() {
+        el.classList.remove('ios-popup-enter');
+    }, { once: true });
+});
+
 function fitAllMarkers() {
     var merged = L.featureGroup([playerLayer, blipsLayer, focusLayer]);
     if (merged.getLayers().length > 0) {
@@ -165,7 +379,9 @@ function addBlipMarkers(list) {
         }
         if (!Number.isFinite(sp) || sp < 0) sp = 0;
         sp = Math.floor(sp);
-        L.marker([py, px], { icon: iconForSprite(sp, false, null) }).bindPopup(lab).addTo(blipsLayer);
+        var mk = L.marker([py, px], { icon: iconForSprite(sp, false, null) });
+        attachBlipSelect(mk, px, py, lab, sp);
+        mk.addTo(blipsLayer);
     });
 }
 
@@ -183,7 +399,14 @@ if (coordsList) {
             var sp = parts.length >= 4 ? parts[3] : null;
             var isPlayer = idx === playerMarkerIndex;
             var layer = isPlayer ? playerLayer : blipsLayer;
-            L.marker([py, px], { icon: iconForSprite(sp, isPlayer, null) }).bindPopup(popupText).addTo(layer);
+            var spNum = sp !== null ? parseInt(sp, 10) : null;
+            var mk = L.marker([py, px], { icon: iconForSprite(sp, isPlayer, null) });
+            if (isPlayer) {
+                bindIosPopup(mk, popupText, null, true);
+            } else if (spNum !== null && Number.isFinite(spNum)) {
+                attachBlipSelect(mk, px, py, popupText, spNum);
+            }
+            mk.addTo(layer);
         }
     });
     fitAllMarkers();
@@ -192,7 +415,7 @@ if (coordsList) {
     var y = parseFloat(params.get('y')) || 0;
     var textParam = params.get('text');
     var popupText = textParam ? popupFromPart(textParam) : ('' + x + ', ' + y);
-    L.marker([y, x], { icon: iconForSprite(null, true, playerHeadingParam) }).addTo(playerLayer).bindPopup(popupText);
+    bindIosPopup(L.marker([y, x], { icon: iconForSprite(null, true, playerHeadingParam) }), popupText, null, true).addTo(playerLayer);
     mymap.setView([y, x], 4);
 }
 
@@ -227,18 +450,29 @@ window.addEventListener('message', function(ev) {
         var fx = Number(d.x);
         var fy = Number(d.y);
         if (!Number.isFinite(fx) || !Number.isFinite(fy)) return;
+        if (d.panOnly) {
+            mymap.setView([fy, fx], 4);
+            return;
+        }
         if (window.__phoneFocusMarker) {
             focusLayer.removeLayer(window.__phoneFocusMarker);
             window.__phoneFocusMarker = null;
         }
         var lab = typeof d.label === 'string' ? d.label : '';
+        var isPlayer = d.isPlayer === true;
+        var hd = d.heading;
         var sp = typeof d.sprite === 'number' && Number.isFinite(d.sprite) && d.sprite >= 0 ? Math.floor(d.sprite) : 67;
-        window.__phoneFocusMarker = L.marker([fy, fx], { icon: iconForSprite(sp, false, null) })
-            .bindPopup(lab || 'Location')
-            .addTo(focusLayer);
+        window.__phoneFocusMarker = bindIosPopup(
+            L.marker([fy, fx], { icon: iconForSprite(isPlayer ? null : sp, isPlayer, hd) }),
+            lab || 'Location',
+            isPlayer ? null : sp,
+            isPlayer
+        ).addTo(focusLayer);
         mymap.setView([fy, fx], 4);
     }
 });
+
+postToPhone({ source: '0r-phone-map', type: 'mapReady', version: 11 });
 </script>
 </body>
 </html>
