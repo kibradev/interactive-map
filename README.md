@@ -1,7 +1,10 @@
-<<<<<<< HEAD
 # GTA V MAP LEAFLET
 
 Leaflet tabanlı GTA V dünya haritası. `salary.0resmon.org/interactive-map` ile aynı kök yapıda deploy edilir.
+
+## Oyuncu marker’ı
+
+Oyuncu satırı (`playerMarkerIndex` ile işaretli veya tek nokta modunda) Apple Maps tarzı mavi puck + yön külahı (`#0C79FE`) ile çizilir; Figma: [Apple Maps iOS26 — Pin](https://www.figma.com/design/awhBqnRalWesSpPorqf7FC/Apple-Maps-iOS26--Community-?node-id=1-2214&m=dev).
 
 ## Blip PNG’leri
 
@@ -23,6 +26,7 @@ GIF kaynaklı sprite’lar için: `pip install pillow`. Güncelleme: `--skip-exi
 |-----------|----------|
 | `coords` | `x,y,urlEncodedLabel` veya `x,y,label,spriteId` — noktalı virgülle çoklu marker |
 | `playerMarkerIndex` | Oyuncu satırının `coords` içindeki indeksi (`0` veya `-1`) |
+| `playerHeading` | İsteğe bağlı; oyuncu yönü derece (0–360, kuzey=0, saat yönü). 0r-phone iframe ile gönderir. |
 | `blipIconBase` | İsteğe bağlı; bitiş `/` ile tam HTTPS taban (CDN) |
 | `x`, `y`, `text` | `coords` yokken tek nokta gösterimi |
 
@@ -38,6 +42,3 @@ GIF kaynaklı sprite’lar için: `pip install pillow`. Güncelleme: `--skip-exi
 ## Lisans
 
 MIT
-=======
-
->>>>>>> 718b30dd66330067318982090d8b89989ce25f26
