@@ -277,6 +277,7 @@ function iosPopupHtml(label, spriteId, isPlayer) {
 
 function bindIosPopup(marker, label, spriteId, isPlayer) {
     marker.bindPopup(iosPopupHtml(label, spriteId, isPlayer), IOS_POPUP_OPTS);
+    return marker;
 }
 
 function postToPhone(payload) {
@@ -472,7 +473,7 @@ window.addEventListener('message', function(ev) {
     }
 });
 
-postToPhone({ source: '0r-phone-map', type: 'mapReady', version: 11 });
+postToPhone({ source: '0r-phone-map', type: 'mapReady', version: 12 });
 </script>
 </body>
 </html>
