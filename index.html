@@ -123,6 +123,23 @@
     .ios-route-halo {
         filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
     }
+
+    .map-blip-tint-wrap {
+        background: transparent !important;
+        border: none !important;
+    }
+
+    .map-blip-tint {
+        display: block;
+        width: 22px;
+        height: 22px;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+    }
 </style>
 </head>
 <body>
@@ -223,7 +240,11 @@ function iconPlayerIos(headingDeg) {
     });
 }
 
-function iconForSprite(spriteId, isPlayer, headingDeg) {
+function isValidTintHex(hex) {
+    return typeof hex === 'string' && /^#[0-9A-Fa-f]{6}$/.test(hex.trim());
+}
+
+function iconForSprite(spriteId, isPlayer, headingDeg, colorHex) {
     if (isPlayer) {
         var hd = playerHeadingParam;
         if (hd === null && headingDeg !== undefined && headingDeg !== null) {
@@ -233,8 +254,19 @@ function iconForSprite(spriteId, isPlayer, headingDeg) {
     }
     var sid = parseInt(spriteId, 10);
     if (!Number.isFinite(sid) || sid < 0) sid = 1;
+    var iconUrl = blipIconUrl(sid);
+    if (isValidTintHex(colorHex)) {
+        var tint = colorHex.trim();
+        return L.divIcon({
+            className: 'map-blip-tint-wrap',
+            html: '<span class="map-blip-tint" style="background-color:' + tint + ';-webkit-mask-image:url(\'' + iconUrl + '\');mask-image:url(\'' + iconUrl + '\');"></span>',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+            popupAnchor: [0, -12]
+        });
+    }
     return L.icon({
-        iconUrl: blipIconUrl(sid),
+        iconUrl: iconUrl,
         iconSize: [22, 22],
         iconAnchor: [11, 11],
         popupAnchor: [0, -12],
@@ -538,7 +570,8 @@ function addBlipMarkers(list) {
         }
         if (!Number.isFinite(sp) || sp < 0) sp = 0;
         sp = Math.floor(sp);
-        var mk = L.marker([py, px], { icon: iconForSprite(sp, false, null) });
+        var tint = typeof m.colorHex === 'string' ? m.colorHex.trim() : '';
+        var mk = L.marker([py, px], { icon: iconForSprite(sp, false, null, tint) });
         attachBlipSelect(mk, px, py, lab, sp);
         mk.addTo(blipsLayer);
     });
