@@ -119,6 +119,10 @@
         animation: iosMapPopupIn 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
         transform-origin: center top;
     }
+
+    .ios-route-halo {
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+    }
 </style>
 </head>
 <body>
@@ -240,7 +244,119 @@ function iconForSprite(spriteId, isPlayer, headingDeg) {
 
 var playerLayer = L.featureGroup().addTo(mymap);
 var blipsLayer = L.featureGroup().addTo(mymap);
+mymap.createPane('routePane');
+mymap.getPane('routePane').style.zIndex = 410;
+var routeLayer = L.featureGroup().addTo(mymap);
 var focusLayer = L.featureGroup().addTo(mymap);
+
+window.__phonePlayer = null;
+window.__phoneRouteLines = [];
+
+function setPhonePlayer(x, y, heading) {
+    if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return;
+    window.__phonePlayer = { x: Number(x), y: Number(y), heading: heading };
+}
+
+function clearBlipPreview() {
+    routeLayer.clearLayers();
+    window.__phoneRouteLines = [];
+}
+
+function iosRouteLatLngs(fromY, fromX, toY, toX) {
+    var dx = toX - fromX;
+    var dy = toY - fromY;
+    var dist = Math.hypot(dx, dy);
+    if (!Number.isFinite(dist) || dist < 2) {
+        return [[fromY, fromX], [toY, toX]];
+    }
+    var midY = (fromY + toY) / 2;
+    var midX = (fromX + toX) / 2;
+    var bulge = Math.min(dist * 0.14, 90);
+    var nx = -dy / dist;
+    var ny = dx / dist;
+    var ctrlY = midY + ny * bulge;
+    var ctrlX = midX + nx * bulge;
+    var pts = [];
+    var steps = 28;
+    for (var i = 0; i <= steps; i++) {
+        var t = i / steps;
+        var u = 1 - t;
+        pts.push([
+            u * u * fromY + 2 * u * t * ctrlY + t * t * toY,
+            u * u * fromX + 2 * u * t * ctrlX + t * t * toX
+        ]);
+    }
+    return pts;
+}
+
+function drawIosRoute(fromX, fromY, toX, toY, mode) {
+    clearBlipPreview();
+    var fromLat = fromY;
+    var fromLng = fromX;
+    var toLat = toY;
+    var toLng = toX;
+    var pts = iosRouteLatLngs(fromLat, fromLng, toLat, toLng);
+    var isWalk = mode === 'walk';
+    var halo = L.polyline(pts, {
+        pane: 'routePane',
+        color: '#ffffff',
+        weight: isWalk ? 7 : 9,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+        className: 'ios-route-halo',
+        interactive: false
+    }).addTo(routeLayer);
+    var line = L.polyline(pts, {
+        pane: 'routePane',
+        color: isWalk ? '#34C759' : '#0A84FF',
+        weight: isWalk ? 4 : 5,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round',
+        dashArray: isWalk ? '10, 12' : null,
+        interactive: false
+    }).addTo(routeLayer);
+    window.__phoneRouteLines = [halo, line];
+}
+
+function fitBlipPreview(fromX, fromY, toX, toY) {
+    var bounds = L.latLngBounds([[fromY, fromX], [toY, toX]]);
+    var opts = { padding: [72, 72], maxZoom: 5, animate: true, duration: 0.55 };
+    if (typeof mymap.flyToBounds === 'function') {
+        mymap.flyToBounds(bounds, opts);
+    } else {
+        mymap.fitBounds(bounds, opts);
+    }
+}
+
+function showBlipPreview(fromX, fromY, toX, toY, opts) {
+    opts = opts || {};
+    setPhonePlayer(fromX, fromY, null);
+    var mode = opts.mode === 'walk' ? 'walk' : 'drive';
+    if (Number.isFinite(fromX) && Number.isFinite(fromY)) {
+        drawIosRoute(fromX, fromY, toX, toY, mode);
+        fitBlipPreview(fromX, fromY, toX, toY);
+    } else {
+        clearBlipPreview();
+        if (typeof mymap.flyTo === 'function') {
+            mymap.flyTo([toY, toX], 5, { animate: true, duration: 0.5 });
+        } else {
+            mymap.setView([toY, toX], 5);
+        }
+    }
+}
+
+function focusBlipOnMap(x, y, label, sprite) {
+    var p = window.__phonePlayer;
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+        showBlipPreview(p.x, p.y, x, y, { label: label, sprite: sprite, mode: 'drive' });
+    } else if (typeof mymap.flyTo === 'function') {
+        mymap.flyTo([y, x], 5, { animate: true, duration: 0.5 });
+    } else {
+        mymap.setView([y, x], 5);
+    }
+}
 
 function popupFromPart(p) {
     if (!p) return '';
@@ -314,6 +430,7 @@ function attachBlipSelect(marker, x, y, label, sprite) {
             L.DomEvent.stopPropagation(ev.originalEvent);
         }
         suppressBlipMapClear = true;
+        focusBlipOnMap(x, y, label, sprite);
         postBlipSelect(x, y, label, sprite);
         window.setTimeout(function() {
             suppressBlipMapClear = false;
@@ -342,10 +459,12 @@ mymap.on('click', function(ev) {
     if (suppressBlipMapClear) return;
     var hit = findNearestBlipAt(ev.latlng, 140);
     if (hit) {
+        focusBlipOnMap(hit.x, hit.y, hit.label, hit.sprite);
         postBlipSelect(hit.x, hit.y, hit.label, hit.sprite);
         return;
     }
     postBlipClear();
+    clearBlipPreview();
 });
 
 mymap.on('popupopen', function(ev) {
@@ -403,6 +522,7 @@ if (coordsList) {
             var spNum = sp !== null ? parseInt(sp, 10) : null;
             var mk = L.marker([py, px], { icon: iconForSprite(sp, isPlayer, null) });
             if (isPlayer) {
+                setPhonePlayer(px, py, playerHeadingParam);
                 bindIosPopup(mk, popupText, null, true);
             } else if (spNum !== null && Number.isFinite(spNum)) {
                 attachBlipSelect(mk, px, py, popupText, spNum);
@@ -440,12 +560,40 @@ window.addEventListener('message', function(ev) {
         fitAllMarkers();
         return;
     }
+    if (d.type === 'blipPreview') {
+        if (d.clear) {
+            clearBlipPreview();
+            return;
+        }
+        var pfx = Number(d.fromX);
+        var pfy = Number(d.fromY);
+        var ptx = Number(d.toX);
+        var pty = Number(d.toY);
+        if (!Number.isFinite(ptx) || !Number.isFinite(pty)) return;
+        var previewMode = d.mode === 'walk' ? 'walk' : 'drive';
+        if (Number.isFinite(pfx) && Number.isFinite(pfy)) {
+            showBlipPreview(pfx, pfy, ptx, pty, {
+                label: typeof d.label === 'string' ? d.label : '',
+                sprite: d.sprite,
+                mode: previewMode
+            });
+        } else {
+            clearBlipPreview();
+            if (typeof mymap.flyTo === 'function') {
+                mymap.flyTo([pty, ptx], 5, { animate: true, duration: 0.5 });
+            } else {
+                mymap.setView([pty, ptx], 5);
+            }
+        }
+        return;
+    }
     if (d.type === 'focusPoint') {
         if (d.clear) {
             if (window.__phoneFocusMarker) {
                 focusLayer.removeLayer(window.__phoneFocusMarker);
                 window.__phoneFocusMarker = null;
             }
+            clearBlipPreview();
             return;
         }
         var fx = Number(d.x);
@@ -469,11 +617,19 @@ window.addEventListener('message', function(ev) {
             isPlayer ? null : sp,
             isPlayer
         ).addTo(focusLayer);
-        mymap.setView([fy, fx], 4);
+        var travelMode = d.travelMode === 'walk' ? 'walk' : 'drive';
+        var p = window.__phonePlayer;
+        if (!isPlayer && p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+            showBlipPreview(p.x, p.y, fx, fy, { label: lab, sprite: sp, mode: travelMode });
+        } else if (typeof mymap.flyTo === 'function') {
+            mymap.flyTo([fy, fx], 4, { animate: true, duration: 0.45 });
+        } else {
+            mymap.setView([fy, fx], 4);
+        }
     }
 });
 
-postToPhone({ source: '0r-phone-map', type: 'mapReady', version: 12 });
+postToPhone({ source: '0r-phone-map', type: 'mapReady', version: 13 });
 </script>
 </body>
 </html>
