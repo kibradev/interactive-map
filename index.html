@@ -253,6 +253,7 @@ window.__phonePlayer = null;
 window.__phoneRouteLines = [];
 window.__phonePreviewActive = false;
 window.__phonePlayerMarker = null;
+window.__phoneFollowPlayer = false;
 
 function setPhonePlayer(x, y, heading) {
     if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return;
@@ -376,13 +377,28 @@ function updatePlayerMarker(x, y, label, heading) {
 
 function centerOnPlayerIfIdle() {
     if (window.__phonePreviewActive) return;
+    if (!window.__phoneFollowPlayer) return;
+    centerOnPlayerNow(4);
+}
+
+function centerOnPlayerNow(zoom) {
     var p = window.__phonePlayer;
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+    var z = Number(zoom);
+    if (!Number.isFinite(z)) z = 4;
     if (typeof mymap.flyTo === 'function') {
-        mymap.flyTo([p.y, p.x], 4, { animate: true, duration: 0.45 });
+        mymap.flyTo([p.y, p.x], z, { animate: true, duration: 0.45 });
     } else {
-        mymap.setView([p.y, p.x], 4);
+        mymap.setView([p.y, p.x], z);
     }
+}
+
+function setPhoneFollowPlayer(enabled) {
+    window.__phoneFollowPlayer = enabled === true;
+}
+
+function postFollowChanged(enabled) {
+    postToPhone({ source: '0r-phone-map', type: 'followChanged', enabled: enabled === true });
 }
 
 function focusBlipOnMap(x, y, label, sprite) {
@@ -523,6 +539,19 @@ function fitAllMarkers() {
     }
 }
 
+mymap.on('dragstart', function() {
+    if (!window.__phoneFollowPlayer) return;
+    setPhoneFollowPlayer(false);
+    postFollowChanged(false);
+});
+
+mymap.on('zoomstart', function(ev) {
+    if (!ev || !ev.originalEvent) return;
+    if (!window.__phoneFollowPlayer) return;
+    setPhoneFollowPlayer(false);
+    postFollowChanged(false);
+});
+
 function addBlipMarkers(list) {
     blipsLayer.clearLayers();
     if (!Array.isArray(list)) return;
@@ -607,6 +636,31 @@ window.addEventListener('message', function(ev) {
         updatePlayerMarker(ux, uy, ulab, Number.isFinite(uhd) ? uhd : null);
         if (!window.__phonePreviewActive) {
             centerOnPlayerIfIdle();
+        }
+        return;
+    }
+    if (d.type === 'fitAll') {
+        window.__phonePreviewActive = false;
+        setPhoneFollowPlayer(false);
+        clearBlipPreview();
+        fitAllMarkers();
+        return;
+    }
+    if (d.type === 'centerPlayer') {
+        window.__phonePreviewActive = false;
+        if (d.follow === true) {
+            setPhoneFollowPlayer(true);
+        } else if (d.follow === false) {
+            setPhoneFollowPlayer(false);
+        }
+        var cz = Number(d.zoom);
+        centerOnPlayerNow(Number.isFinite(cz) ? cz : 4);
+        return;
+    }
+    if (d.type === 'setFollow') {
+        setPhoneFollowPlayer(d.enabled === true);
+        if (d.enabled === true) {
+            centerOnPlayerNow(4);
         }
         return;
     }
