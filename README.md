@@ -30,6 +30,14 @@ GIF kaynaklı sprite’lar için: `pip install pillow`. Güncelleme: `--skip-exi
 | `blipIconBase` | İsteğe bağlı; bitiş `/` ile tam HTTPS taban (CDN) |
 | `x`, `y`, `text` | `coords` yokken tek nokta gösterimi |
 
+## Sorun giderme (mavi ekran, `<<<<<<<`)
+
+Sayfada üstte `<<<<<<< HEAD` yazıyorsa veya harita hiç yüklenmiyorsa `index.html` içinde **çözülmemiş Git merge** kalmış demektir; bu metinler `<script>`’i kırar, Leaflet çalışmaz.
+
+1. `index.html` içinde `<<<<<<<`, `=======`, `>>>>>>>` satırlarını tamamen silin veya bu repodaki güncel `index.html`’i kullanın.  
+2. `git grep '<<<<<<<'` ile repoda kalan marker arayın.  
+3. Eski sayfa önbellekte kaldıysa tarayıcıda sert yenileme yapın; 0r-phone iframe URL’sine `_mv` sürüm parametresi eklenir (önbellek kırma).
+
 ## Map stilleri
 
 `mapStyles/` altında Atlas / Satellite / Grid tile setleri (README’deki mega link veya mevcut deploy’dan kopyala).
