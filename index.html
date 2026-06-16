@@ -5,49 +5,117 @@
 <title>Custom GTA Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-<style>#map{    width: 100%;
-    height: 100vh;     background: #0fa8d2;}</style>
+<style>
+    #map { width: 100%; height: 100vh; background: #0fa8d2; }
+    body { overflow: hidden; margin: 0; }
+</style>
 </head>
-<body style="overflow: hidden; margin: 0;">
+<body>
 <div id="map"></div>
 <script>
-const center_x=117.3,center_y=172.8,scale_x=0.02072,scale_y=0.0205
-CUSTOM_CRS=L.extend({},L.CRS.Simple,{
-projection:L.Projection.LonLat,
-scale:z=>Math.pow(2,z),
-zoom:sc=>Math.log(sc)/0.6931471805599453,
-distance:(p1,p2)=>Math.sqrt(Math.pow(p2.lng-p1.lng,2)+Math.pow(p2.lat-p1.lat,2)),
-transformation:new L.Transformation(scale_x,center_x,-scale_y,center_y),
-infinite:true
-})
-var Satelite=L.tileLayer('mapStyles/styleSatelite/{z}/{x}/{y}.jpg',{minZoom:0,maxZoom:8,noWrap:true,continuousWorld:false,id:'Satelite'})
-var Atlas=L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg',{minZoom:0,maxZoom:5,noWrap:true,continuousWorld:false,id:'Atlas'})
-var Grid=L.tileLayer('mapStyles/styleGrid/{z}/{x}/{y}.png',{minZoom:0,maxZoom:5,noWrap:true,continuousWorld:false,id:'Grid'})
-var ExampleGroup=L.layerGroup()
-var Icons={"Example":ExampleGroup}
-var mymap=L.map('map',{
-crs:CUSTOM_CRS,
-minZoom:1,
-maxZoom:5,
-layers:[Atlas],
-center:[0,0],
-zoom:3
-})
-// L.control.layers({"Satelite":Satelite,"Atlas":Atlas,"Grid":Grid},Icons).addTo(mymap)
-function customIcon(i){
-return L.icon({
-iconUrl:'blips/1.png',
-iconSize:[20,20],
-iconAnchor:[20,20],
-popupAnchor:[-10,-27]
-})
+var center_x = 117.3;
+var center_y = 172.8;
+var scale_x = 0.02072;
+var scale_y = 0.0205;
+
+var CUSTOM_CRS = L.extend({}, L.CRS.Simple, {
+    projection: L.Projection.LonLat,
+    scale: function(zoom) { return Math.pow(2, zoom); },
+    zoom: function(sc) { return Math.log(sc) / 0.6931471805599453; },
+    distance: function(pos1, pos2) {
+        var x_difference = pos2.lng - pos1.lng;
+        var y_difference = pos2.lat - pos1.lat;
+        return Math.sqrt(x_difference * x_difference + y_difference * y_difference);
+    },
+    transformation: new L.Transformation(scale_x, center_x, -scale_y, center_y),
+    infinite: true
+});
+
+var AtlasStyle = L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg', {
+    minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false,
+    attribution: 'Online map GTA V', id: 'styleAtlas map'
+});
+
+var mymap = L.map('map', {
+    crs: CUSTOM_CRS,
+    minZoom: 1,
+    maxZoom: 5,
+    maxNativeZoom: 5,
+    preferCanvas: false,
+    layers: [AtlasStyle],
+    center: [0, 0],
+    zoom: 3,
+    zoomControl: false,
+    attributionControl: false
+});
+
+var params = new URLSearchParams(window.location.search);
+var rawBase = params.get('blipIconBase');
+var blipIconBase = null;
+if (rawBase) {
+    try { rawBase = decodeURIComponent(rawBase); } catch (e0) {}
+    rawBase = (rawBase || '').trim();
+    if (rawBase.indexOf('https://') === 0 || rawBase.indexOf('http://127.0.0.1') === 0 || rawBase.indexOf('http://localhost') === 0) {
+        blipIconBase = rawBase.replace(/\/?$/, '/');
+    }
 }
-var params=new URLSearchParams(window.location.search)
-var x=parseFloat(params.get('x'))||0
-var y=parseFloat(params.get('y'))||0
-ExampleGroup.addTo(mymap)
-mymap.setView([y,x],4)
-L.marker([y,x],{icon:customIcon(1)}).addTo(ExampleGroup).bindPopup("Burdayım aw")
+
+var playerMarkerIndex = parseInt(params.get('playerMarkerIndex'), 10);
+if (!Number.isFinite(playerMarkerIndex)) playerMarkerIndex = -1;
+
+function blipIconUrl(spriteId) {
+    var sid = parseInt(spriteId, 10);
+    if (!Number.isFinite(sid) || sid < 0) sid = 1;
+    if (blipIconBase) return blipIconBase + sid + '.png';
+    return 'blips/' + sid + '.png';
+}
+
+function iconForSprite(spriteId, isPlayer) {
+    var sid = parseInt(spriteId, 10);
+    if (!Number.isFinite(sid) || sid < 0) sid = isPlayer ? 6 : 1;
+    return L.icon({
+        iconUrl: blipIconUrl(sid),
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+        popupAnchor: [0, -12],
+        crossOrigin: true
+    });
+}
+
+var markerLayer = L.featureGroup().addTo(mymap);
+
+function popupFromPart(p) {
+    if (!p) return '';
+    try { return decodeURIComponent(p); } catch (e1) { return p; }
+}
+
+var coordsList = params.get('coords');
+
+if (coordsList) {
+    var points = coordsList.split(';');
+    points.forEach(function(point, idx) {
+        var parts = point.split(',');
+        if (parts.length >= 2) {
+            var px = parseFloat(parts[0]);
+            var py = parseFloat(parts[1]);
+            if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+            var popupText = parts.length >= 3 ? popupFromPart(parts[2]) : ('' + px + ', ' + py);
+            var sp = parts.length >= 4 ? parts[3] : null;
+            var isPlayer = idx === playerMarkerIndex;
+            L.marker([py, px], { icon: iconForSprite(sp, isPlayer) }).bindPopup(popupText).addTo(markerLayer);
+        }
+    });
+    if (markerLayer.getLayers().length > 0) {
+        mymap.fitBounds(markerLayer.getBounds(), { padding: [50, 50] });
+    }
+} else {
+    var x = parseFloat(params.get('x')) || 0;
+    var y = parseFloat(params.get('y')) || 0;
+    var textParam = params.get('text');
+    var popupText = textParam ? popupFromPart(textParam) : ('' + x + ', ' + y);
+    L.marker([y, x], { icon: iconForSprite(null, true) }).addTo(markerLayer).bindPopup(popupText);
+    mymap.setView([y, x], 4);
+}
 </script>
 </body>
 </html>
