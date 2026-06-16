@@ -137,6 +137,7 @@ function iconForSprite(spriteId, isPlayer, headingDeg) {
 
 var playerLayer = L.featureGroup().addTo(mymap);
 var blipsLayer = L.featureGroup().addTo(mymap);
+var focusLayer = L.featureGroup().addTo(mymap);
 
 function popupFromPart(p) {
     if (!p) return '';
@@ -144,7 +145,7 @@ function popupFromPart(p) {
 }
 
 function fitAllMarkers() {
-    var merged = L.featureGroup([playerLayer, blipsLayer]);
+    var merged = L.featureGroup([playerLayer, blipsLayer, focusLayer]);
     if (merged.getLayers().length > 0) {
         mymap.fitBounds(merged.getBounds(), { padding: [50, 50] });
     }
@@ -154,10 +155,17 @@ function addBlipMarkers(list) {
     blipsLayer.clearLayers();
     if (!Array.isArray(list)) return;
     list.forEach(function(m) {
-        if (!m || !Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
+        if (!m || !Number.isFinite(Number(m.x)) || !Number.isFinite(Number(m.y))) return;
+        var px = Number(m.x);
+        var py = Number(m.y);
         var lab = String(m.label || '').trim() || 'Marker';
-        var sp = typeof m.sprite === 'number' && Number.isFinite(m.sprite) && m.sprite >= 0 ? Math.floor(m.sprite) : 0;
-        L.marker([m.y, m.x], { icon: iconForSprite(sp, false, null) }).bindPopup(lab).addTo(blipsLayer);
+        var sp = m.sprite;
+        if (typeof sp !== 'number' || !Number.isFinite(sp)) {
+            sp = parseInt(sp, 10);
+        }
+        if (!Number.isFinite(sp) || sp < 0) sp = 0;
+        sp = Math.floor(sp);
+        L.marker([py, px], { icon: iconForSprite(sp, false, null) }).bindPopup(lab).addTo(blipsLayer);
     });
 }
 
@@ -189,21 +197,47 @@ if (coordsList) {
 }
 
 function isAllowedMapParent(origin) {
-    if (!origin || typeof origin !== 'string') return false;
+    if (origin == null || typeof origin !== 'string') return false;
     if (origin.indexOf('https://cfx-nui-') === 0) return true;
     if (origin.indexOf('nui://') === 0) return true;
     if (origin.indexOf('http://localhost') === 0) return true;
     if (origin.indexOf('http://127.0.0.1') === 0) return true;
     if (origin === 'null') return true;
+    if (origin.indexOf('https://') === 0) return true;
     return false;
 }
 
 window.addEventListener('message', function(ev) {
     if (!isAllowedMapParent(ev.origin)) return;
     var d = ev.data;
-    if (!d || d.source !== '0r-phone-map' || d.type !== 'blips') return;
-    addBlipMarkers(d.markers);
-    fitAllMarkers();
+    if (!d || d.source !== '0r-phone-map') return;
+    if (d.type === 'blips') {
+        addBlipMarkers(Array.isArray(d.markers) ? d.markers : []);
+        fitAllMarkers();
+        return;
+    }
+    if (d.type === 'focusPoint') {
+        if (d.clear) {
+            if (window.__phoneFocusMarker) {
+                focusLayer.removeLayer(window.__phoneFocusMarker);
+                window.__phoneFocusMarker = null;
+            }
+            return;
+        }
+        var fx = Number(d.x);
+        var fy = Number(d.y);
+        if (!Number.isFinite(fx) || !Number.isFinite(fy)) return;
+        if (window.__phoneFocusMarker) {
+            focusLayer.removeLayer(window.__phoneFocusMarker);
+            window.__phoneFocusMarker = null;
+        }
+        var lab = typeof d.label === 'string' ? d.label : '';
+        var sp = typeof d.sprite === 'number' && Number.isFinite(d.sprite) && d.sprite >= 0 ? Math.floor(d.sprite) : 67;
+        window.__phoneFocusMarker = L.marker([fy, fx], { icon: iconForSprite(sp, false, null) })
+            .bindPopup(lab || 'Location')
+            .addTo(focusLayer);
+        mymap.setView([fy, fx], 4);
+    }
 });
 </script>
 </body>
