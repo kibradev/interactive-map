@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # GTA V MAP LEAFLET
 
 Leaflet tabanlı GTA V dünya haritası. `salary.0resmon.org/interactive-map` ile aynı kök yapıda deploy edilir.
@@ -37,3 +38,6 @@ GIF kaynaklı sprite’lar için: `pip install pillow`. Güncelleme: `--skip-exi
 ## Lisans
 
 MIT
+=======
+
+>>>>>>> 718b30dd66330067318982090d8b89989ce25f26
