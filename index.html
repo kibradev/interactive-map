@@ -530,6 +530,7 @@ function addBlipMarkers(list) {
         if (!m || !Number.isFinite(Number(m.x)) || !Number.isFinite(Number(m.y))) return;
         var px = Number(m.x);
         var py = Number(m.y);
+        if (Math.abs(px) <= 1 && Math.abs(py) <= 1) return;
         var lab = String(m.label || '').trim() || 'Marker';
         var sp = m.sprite;
         if (typeof sp !== 'number' || !Number.isFinite(sp)) {
@@ -553,6 +554,7 @@ if (coordsList) {
             var px = parseFloat(parts[0]);
             var py = parseFloat(parts[1]);
             if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+            if (Math.abs(px) <= 1 && Math.abs(py) <= 1) return;
             var popupText = parts.length >= 3 ? popupFromPart(parts[2]) : ('' + px + ', ' + py);
             var sp = parts.length >= 4 ? parts[3] : null;
             var isPlayer = idx === playerMarkerIndex;
@@ -570,12 +572,15 @@ if (coordsList) {
     });
     fitAllMarkers();
 } else {
-    var x = parseFloat(params.get('x')) || 0;
-    var y = parseFloat(params.get('y')) || 0;
-    var textParam = params.get('text');
-    var popupText = textParam ? popupFromPart(textParam) : ('' + x + ', ' + y);
-    bindIosPopup(L.marker([y, x], { icon: iconForSprite(null, true, playerHeadingParam) }), popupText, null, true).addTo(playerLayer);
-    mymap.setView([y, x], 4);
+    var x = parseFloat(params.get('x'));
+    var y = parseFloat(params.get('y'));
+    var hasExplicitPoint = Number.isFinite(x) && Number.isFinite(y) && (Math.abs(x) > 1 || Math.abs(y) > 1);
+    if (hasExplicitPoint) {
+        var textParam = params.get('text');
+        var popupText = textParam ? popupFromPart(textParam) : ('' + x + ', ' + y);
+        bindIosPopup(L.marker([y, x], { icon: iconForSprite(null, true, playerHeadingParam) }), popupText, null, true).addTo(playerLayer);
+        mymap.setView([y, x], 4);
+    }
 }
 
 function isAllowedMapParent(origin) {
