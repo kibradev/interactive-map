@@ -24,7 +24,7 @@ GIF kaynaklı sprite’lar için: `pip install pillow`. Güncelleme: `--skip-exi
 
 | Parametre | Açıklama |
 |-----------|----------|
-| `coords` | `x,y,urlEncodedLabel` veya `x,y,label,spriteId` — noktalı virgülle çoklu marker |
+| `coords` | URL’de kısa tutun: 0r-phone yalnızca **oyuncu** satırını gönderir. Dünya blipleri `postMessage` ile gelir (URI limiti). Elle test: `x,y,label` veya `x,y,label,spriteId` — `;` ile çoklu (uzun URL’den kaçının). |
 | `playerMarkerIndex` | Oyuncu satırının `coords` içindeki indeksi (`0` veya `-1`) |
 | `playerHeading` | İsteğe bağlı; oyuncu yönü derece (0–360, kuzey=0, saat yönü). 0r-phone iframe ile gönderir. |
 | `blipIconBase` | İsteğe bağlı; bitiş `/` ile tam HTTPS taban (CDN) |
@@ -38,9 +38,17 @@ Sayfada üstte `<<<<<<< HEAD` yazıyorsa veya harita hiç yüklenmiyorsa `index.
 2. `git grep '<<<<<<<'` ile repoda kalan marker arayın.  
 3. Eski sayfa önbellekte kaldıysa tarayıcıda sert yenileme yapın; 0r-phone iframe URL’sine `_mv` sürüm parametresi eklenir (önbellek kırma).
 
+## 0r-phone entegrasyonu (blips)
+
+Tablet, dünya bliplerini uzun query yerine `postMessage` ile gönderir:
+
+- `data.source === '0r-phone-map'`
+- `data.type === 'blips'`
+- `data.markers`: `{ x, y, label, sprite? }[]`
+
 ## Map stilleri
 
-`mapStyles/` altında Atlas / Satellite / Grid tile setleri (README’deki mega link veya mevcut deploy’dan kopyala).
+`mapStyles/` altında varsayılan olarak **Atlas** kullanılır (`styleAtlas/…`). Satellite / Grid klasörleri ileride özel fork için durabilir; arayüzde harita tipi seçici yok.
 
 ## Bağımlılıklar
 

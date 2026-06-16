@@ -20,12 +20,9 @@ CUSTOM_CRS = L.extend({}, L.CRS.Simple, {
     infinite: true
 });
 
-var SateliteStyle = L.tileLayer('mapStyles/styleSatelite/{z}/{x}/{y}.jpg', { minZoom: 0, maxZoom: 8, noWrap: true, continuousWorld: false, attribution: 'Online map GTA V', id: 'SateliteStyle map' });
 var AtlasStyle = L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg', { minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false, attribution: 'Online map GTA V', id: 'styleAtlas map' });
-var GridStyle = L.tileLayer('mapStyles/styleGrid/{z}/{x}/{y}.png', { minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false, attribution: 'Online map GTA V', id: 'styleGrid map' });
 
 var ExampleGroup = L.layerGroup();
-var Icons = { Example: ExampleGroup };
 
 var mymap = L.map('map', {
     crs: CUSTOM_CRS,
@@ -39,7 +36,7 @@ var mymap = L.map('map', {
     zoom: 3
 });
 
-L.control.layers({ Satelite: SateliteStyle, Atlas: AtlasStyle, Grid: GridStyle }, Icons).addTo(mymap);
+ExampleGroup.addTo(mymap);
 
 function customIcon(spriteId) {
     var sid = parseInt(spriteId, 10);

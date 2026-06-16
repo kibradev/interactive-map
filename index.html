@@ -39,17 +39,9 @@ var CUSTOM_CRS = L.extend({}, L.CRS.Simple, {
     infinite: true
 });
 
-var SateliteStyle = L.tileLayer('mapStyles/styleSatelite/{z}/{x}/{y}.jpg', {
-    minZoom: 0, maxZoom: 8, noWrap: true, continuousWorld: false,
-    attribution: 'Online map GTA V', id: 'SateliteStyle map'
-});
 var AtlasStyle = L.tileLayer('mapStyles/styleAtlas/{z}/{x}/{y}.jpg', {
     minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false,
     attribution: 'Online map GTA V', id: 'styleAtlas map'
-});
-var GridStyle = L.tileLayer('mapStyles/styleGrid/{z}/{x}/{y}.png', {
-    minZoom: 0, maxZoom: 5, noWrap: true, continuousWorld: false,
-    attribution: 'Online map GTA V', id: 'styleGrid map'
 });
 
 var mymap = L.map('map', {
@@ -64,11 +56,6 @@ var mymap = L.map('map', {
     zoomControl: false,
     attributionControl: false
 });
-
-L.control.layers(
-    { Satelite: SateliteStyle, Atlas: AtlasStyle, Grid: GridStyle },
-    {}
-).addTo(mymap);
 
 var params = new URLSearchParams(window.location.search);
 var rawBase = params.get('blipIconBase');
@@ -148,11 +135,30 @@ function iconForSprite(spriteId, isPlayer, headingDeg) {
     });
 }
 
-var markerLayer = L.featureGroup().addTo(mymap);
+var playerLayer = L.featureGroup().addTo(mymap);
+var blipsLayer = L.featureGroup().addTo(mymap);
 
 function popupFromPart(p) {
     if (!p) return '';
     try { return decodeURIComponent(p); } catch (e1) { return p; }
+}
+
+function fitAllMarkers() {
+    var merged = L.featureGroup([playerLayer, blipsLayer]);
+    if (merged.getLayers().length > 0) {
+        mymap.fitBounds(merged.getBounds(), { padding: [50, 50] });
+    }
+}
+
+function addBlipMarkers(list) {
+    blipsLayer.clearLayers();
+    if (!Array.isArray(list)) return;
+    list.forEach(function(m) {
+        if (!m || !Number.isFinite(m.x) || !Number.isFinite(m.y)) return;
+        var lab = String(m.label || '').trim() || 'Marker';
+        var sp = typeof m.sprite === 'number' && Number.isFinite(m.sprite) && m.sprite >= 0 ? Math.floor(m.sprite) : 0;
+        L.marker([m.y, m.x], { icon: iconForSprite(sp, false, null) }).bindPopup(lab).addTo(blipsLayer);
+    });
 }
 
 var coordsList = params.get('coords');
@@ -168,20 +174,37 @@ if (coordsList) {
             var popupText = parts.length >= 3 ? popupFromPart(parts[2]) : ('' + px + ', ' + py);
             var sp = parts.length >= 4 ? parts[3] : null;
             var isPlayer = idx === playerMarkerIndex;
-            L.marker([py, px], { icon: iconForSprite(sp, isPlayer, null) }).bindPopup(popupText).addTo(markerLayer);
+            var layer = isPlayer ? playerLayer : blipsLayer;
+            L.marker([py, px], { icon: iconForSprite(sp, isPlayer, null) }).bindPopup(popupText).addTo(layer);
         }
     });
-    if (markerLayer.getLayers().length > 0) {
-        mymap.fitBounds(markerLayer.getBounds(), { padding: [50, 50] });
-    }
+    fitAllMarkers();
 } else {
     var x = parseFloat(params.get('x')) || 0;
     var y = parseFloat(params.get('y')) || 0;
     var textParam = params.get('text');
     var popupText = textParam ? popupFromPart(textParam) : ('' + x + ', ' + y);
-    L.marker([y, x], { icon: iconForSprite(null, true, playerHeadingParam) }).addTo(markerLayer).bindPopup(popupText);
+    L.marker([y, x], { icon: iconForSprite(null, true, playerHeadingParam) }).addTo(playerLayer).bindPopup(popupText);
     mymap.setView([y, x], 4);
 }
+
+function isAllowedMapParent(origin) {
+    if (!origin || typeof origin !== 'string') return false;
+    if (origin.indexOf('https://cfx-nui-') === 0) return true;
+    if (origin.indexOf('nui://') === 0) return true;
+    if (origin.indexOf('http://localhost') === 0) return true;
+    if (origin.indexOf('http://127.0.0.1') === 0) return true;
+    if (origin === 'null') return true;
+    return false;
+}
+
+window.addEventListener('message', function(ev) {
+    if (!isAllowedMapParent(ev.origin)) return;
+    var d = ev.data;
+    if (!d || d.source !== '0r-phone-map' || d.type !== 'blips') return;
+    addBlipMarkers(d.markers);
+    fitAllMarkers();
+});
 </script>
 </body>
 </html>
