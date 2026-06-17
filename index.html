@@ -695,6 +695,10 @@ window.addEventListener('message', function(ev) {
         }
         return;
     }
+    if (d.type === 'routeRequest') {
+        if (window.__handleRouteRequest) window.__handleRouteRequest(d);
+        return;
+    }
     if (d.type === 'routeWaypoints') {
         clearBlipPreview();
         if (!Array.isArray(d.points) || d.points.length < 2) return;
@@ -764,5 +768,6 @@ window.addEventListener('message', function(ev) {
 
 postToPhone({ source: '0r-phone-map', type: 'mapReady', version: 14 });
 </script>
+<script src="routing.js"></script>
 </body>
 </html>
