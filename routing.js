@@ -7,13 +7,17 @@
     var closed    = null;
     var loading   = false;
     var CELL      = 150;
+    var pendingResolvers = [];
 
     function loadGraph() {
         if (roadNodes) return Promise.resolve(true);
-        if (loading)   return new Promise(function (res) { setTimeout(function () { res(!!roadNodes); }, 300); });
+        if (loading)   return new Promise(function (res) { pendingResolvers.push(res); });
         loading = true;
         return fetch('road-graph.json')
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
             .then(function (d) {
                 roadNodes = d.n;
                 var rawAdj = new Array(roadNodes.length);
@@ -37,11 +41,15 @@
                     nodeIdx.get(key).push(k);
                 }
                 loading = false;
+                pendingResolvers.forEach(function (res) { res(true); });
+                pendingResolvers = [];
                 return true;
             })
             .catch(function (err) {
                 loading = false;
                 console.warn('[routing] road-graph.json yüklenemedi:', err);
+                pendingResolvers.forEach(function (res) { res(false); });
+                pendingResolvers = [];
                 return false;
             });
     }
