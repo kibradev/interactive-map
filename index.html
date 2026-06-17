@@ -695,6 +695,31 @@ window.addEventListener('message', function(ev) {
         }
         return;
     }
+    if (d.type === 'routeWaypoints') {
+        clearBlipPreview();
+        if (!Array.isArray(d.points) || d.points.length < 2) return;
+        var rwPts = d.points.map(function(p) { return [Number(p.y), Number(p.x)]; });
+        var rwWalk = d.mode === 'walk';
+        L.polyline(rwPts, {
+            pane: 'routePane', color: '#ffffff',
+            weight: rwWalk ? 7 : 9, opacity: 0.95,
+            lineCap: 'round', lineJoin: 'round',
+            className: 'ios-route-halo', interactive: false
+        }).addTo(routeLayer);
+        L.polyline(rwPts, {
+            pane: 'routePane', color: rwWalk ? '#34C759' : '#0A84FF',
+            weight: rwWalk ? 4 : 5, opacity: 1,
+            lineCap: 'round', lineJoin: 'round',
+            dashArray: rwWalk ? '10,12' : null, interactive: false
+        }).addTo(routeLayer);
+        window.__phoneRouteLines = routeLayer.getLayers();
+        window.__phonePreviewActive = true;
+        if (d.fit !== false && d.points.length >= 2) {
+            var rwFirst = d.points[0], rwLast = d.points[d.points.length - 1];
+            fitBlipPreview(Number(rwFirst.x), Number(rwFirst.y), Number(rwLast.x), Number(rwLast.y));
+        }
+        return;
+    }
     if (d.type === 'focusPoint') {
         if (d.clear) {
             if (window.__phoneFocusMarker) {
